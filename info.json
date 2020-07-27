@@ -1,0 +1,9 @@
+{
+    "name": "fac-stats",
+    "version": "0.1.0",
+    "title": "Factorio Stats",
+    "author": "You",
+    "factorio_version": "0.18",
+    "dependencies": ["base >= 0.18"],
+    "description": "This mod adds in fire armor that leaves behind damaging fire as you walk around."
+}
