@@ -1,42 +1,41 @@
-function log_data(tick,line)
-    game.write_file("stats_mod/factorio." .. tick .. ".csv", line .. "\n", false)   
- end
+function log_data(tick, line, name)
+    game.write_file("stats_mod/" .. name .. "_" .. tick .. ".csv", line .. "\n", false)
+end
 
- local statistics = {
+local statistics = {
     "item_production_statistics",
     "fluid_production_statistics",
     "kill_count_statistics",
-    "entity_build_count_statistics",
+    "entity_build_count_statistics"
 }
 
-function merge_line(tick,force_name, stat_name, prod_type, item, amount) 
-    line = tick .. "," .. force_name .. "," .. stat_name .. "," .. prod_type .. "," .. item .. "," .. amount
+function merge_line(tick, name, force_name, stat_name, prod_type, item, amount)
+    line =
+        name .. "," .. tick .. "," .. force_name .. "," .. stat_name .. "," .. prod_type .. "," .. item .. "," .. amount
     return line
 end
- 
- script.on_nth_tick(60, -- every second
- function(event)
 
-    data_to_write = ""
+script.on_nth_tick(
+    60, -- every second
+    function(event)
+        data_to_write = ""
+        game_name = "test_game"
 
-   for k, force in pairs(game.forces) do
+        for k, force in pairs(game.forces) do
+            for _, statName in pairs(statistics) do
+                for item, amount in pairs(force[statName].input_counts) do
+                    data_to_write =
+                        data_to_write ..
+                        merge_line(game_name, game.tick, force.name, statName, "input", item, amount) .. "\n"
+                end
 
-    for _, statName in pairs(statistics) do
-
-        for item, amount in pairs(force[statName].input_counts) do
-            data_to_write = data_to_write .. merge_line(
-                game.tick, force.name, statName,"input",item, amount
-            ) .. "\n"
+                for item, amount in pairs(force[statName].output_counts) do
+                    data_to_write =
+                        data_to_write ..
+                        merge_line(game_name, game.tick, force.name, statName, "output", item, amount) .. "\n"
+                end
+            end
         end
-
-        for item, amount in pairs(force[statName].output_counts) do
-            data_to_write = data_to_write .. merge_line(
-                game.tick, force.name, statName,"output",item, amount
-            ) .. "\n"
-        end
-    
-
-     end
-   end 
-   log_data(game.tick,data_to_write)
- end)
+        log_data(game.tick, data_to_write, game_name)
+    end
+)
