@@ -1,41 +1,243 @@
-function log_data(tick, line, name)
-    game.write_file("stats_mod/" .. name .. "_" .. tick .. ".csv", line .. "\n", false)
-end
-
-local statistics = {
-    "item_production_statistics",
-    "fluid_production_statistics",
-    "kill_count_statistics",
-    "entity_build_count_statistics"
+local Entity = require('__stdlib__/stdlib/entity/entity')
+local ENTITY_NAMES = {
+    ["fac-stats"] = true,
+    ["fac-stats-rate"] = true,
 }
 
-function merge_line(tick, name, force_name, stat_name, prod_type, item, amount)
+local function new_registry_entry(entity)
+
+    return {
+        type="gauge",
+        entity=entity,
+    }
+end
+
+local function new_registry_entry_counter(entity)
+    local entry = new_registry_entry(entity)
+    entry.type = "rate"
+    entry.counters = {}
+    entry.counter_index = 0
+    -- 10s moving average.
+    entry.counter_length = 600
+    return entry
+end
+
+local TYPE_MAP = {
+    virtual = "virtual-signal"
+}
+
+script.on_init(function()
+    global.registry = {}
+    global.gui = {}
+end)
+
+local statistics = {
+    "item_production_statistics", "fluid_production_statistics",
+    "kill_count_statistics", "entity_build_count_statistics"
+}
+
+local function log_data(tick, line, name)
+
+    game.write_file(
+        settings.global["folder-name"].value .. "/" .. name .. "_" .. tick ..
+            ".csv", line .. "\n", false)
+end
+
+
+local function merge_line(tick, name, force_name, stat_name, prod_type, item,
+                          amount)
     line =
-        name .. "," .. tick .. "," .. force_name .. "," .. stat_name .. "," .. prod_type .. "," .. item .. "," .. amount
+        name .. "," .. tick .. "," .. force_name .. "," .. stat_name .. "," ..
+            prod_type .. "," .. item .. "," .. amount
     return line
 end
 
-script.on_nth_tick(
-    60, -- every second
-    function(event)
-        data_to_write = ""
-        game_name = "test_game"
+local function write_global_data(event)
 
-        for k, force in pairs(game.forces) do
-            for _, statName in pairs(statistics) do
-                for item, amount in pairs(force[statName].input_counts) do
-                    data_to_write =
-                        data_to_write ..
-                        merge_line(game_name, game.tick, force.name, statName, "input", item, amount) .. "\n"
-                end
+    data_to_write = ""
+    game_name = "test_game"
 
-                for item, amount in pairs(force[statName].output_counts) do
-                    data_to_write =
-                        data_to_write ..
-                        merge_line(game_name, game.tick, force.name, statName, "output", item, amount) .. "\n"
-                end
+    for k, force in pairs(game.forces) do
+        for _, statName in pairs(statistics) do
+            for item, amount in pairs(force[statName].input_counts) do
+                data_to_write = data_to_write ..
+                                    merge_line(game_name, game.tick, force.name,
+                                               statName, "input", item, amount) ..
+                                    "\n"
+            end
+
+            for item, amount in pairs(force[statName].output_counts) do
+                data_to_write = data_to_write ..
+                                    merge_line(game_name, game.tick, force.name,
+                                               statName, "output", item, amount) ..
+                                    "\n"
             end
         end
-        log_data(game.tick, data_to_write, game_name)
     end
+    log_data(game.tick, data_to_write, game_name)
+
+end
+
+local function merge_line_combinator(tick, entity_id, stat_title, signal_type,
+                                     signal_name, amount)
+    local line = tick .. "," .. entity_id .. "," .. stat_title .. "," ..
+                     signal_type .. "," .. signal_name .. "," .. amount
+    return line
+end
+
+local function write_combinator_data(event)
+
+    local data_to_write = ""
+    for entity_number, entry in pairs(global.registry) do
+        local entity = entry.entity
+
+        if not entity.valid then goto wc_skip_to_next end
+
+        local data = Entity.get_data(entity)
+
+        if data == nil then return end
+
+        local stat_title = data["stat_title"]
+        local signals = entity.get_merged_signals()
+
+        if signals then
+            for _, signal in ipairs(signals) do
+
+                local signal_type = TYPE_MAP[signal.signal.type] or
+                                        signal.signal.type
+
+                data_to_write = data_to_write ..
+                                    merge_line_combinator(game.tick,
+                                                          entity_number,
+                                                          stat_title,
+                                                          signal_type,
+                                                          signal.signal.name,
+                                                          signal.count) .. "\n"
+            end
+        end
+
+        ::wc_skip_to_next::
+    end
+    log_data(game.tick, data_to_write, settings.global['game-name'].value)
+
+end
+
+local function on_tick(event)
+
+    if settings.global["fac-stats-write-global-data"].value then
+        write_global_data(event)
+    end
+
+    if settings.global['write-combinators'].value then
+        write_combinator_data(event)
+    end
+
+end
+
+script.on_nth_tick(60, on_tick)
+
+
+
+local function on_place_entity(event)
+    local entity = event.created_entity
+    if not entity.valid or not ENTITY_NAMES[entity.name] then
+        return
+    end
+    Entity.set_data(entity,{stat_title = entity.unit_number})
+    entity.get_control_behavior().enabled = false
+    local entry
+    if entity.name == "fac-stats" then entry = new_registry_entry(entity) else
+           entry = new_registry_entry_counter(entity)
+    end
+    global.registry[entity.unit_number] = entry
+end
+
+local function on_remove_entity(event)
+    local entity = event.entity
+    if not entity.valid or not ENTITY_NAMES[entity.name] then
+        return
+    end
+
+    global.registry[entity.unit_number] = nil
+end
+
+
+
+script.on_event(defines.events.on_built_entity, on_place_entity)
+script.on_event(defines.events.on_robot_built_entity, on_place_entity)
+
+script.on_event(defines.events.on_pre_player_mined_item, on_remove_entity)
+script.on_event(defines.events.on_robot_pre_mined, on_remove_entity)
+script.on_event(defines.events.on_entity_died, on_remove_entity)
+
+script.on_nth_tick(
+    60,
+    on_tick
 )
+
+
+script.on_event(defines.events.on_gui_opened, function(event)
+    local entity = event.entity
+    if event.gui_type ~= defines.gui_type.entity or not entity or not ENTITY_NAMES[entity.name] then
+        return
+    end
+
+    local entry = global.registry[entity.unit_number]
+    local player = game.players[event.player_index]
+
+    local caption
+    if entry.type == "rate" then
+        caption = {"entity-name.fac-stats-rate"}
+    else
+        caption = {"entity-name.fac-stats"}
+    end
+    local frame = player.gui.center.add{
+        type = "frame",
+        name = "time_series",
+        caption = caption,
+        direction = "vertical",
+    }
+
+    local interval_index = 1
+    local gui = {
+        element = frame,
+        entry = entry,
+        interval_index = interval_index,
+    }
+
+    local data = Entity.get_data(entity)
+    local text = ""
+    if data then
+        text = data["stat_title"]
+    else
+        text = "None"
+    end
+    local text_label = frame.add{type="textfield", name="entity-title", caption="Name",text=text}
+
+    player.opened = frame
+
+    global.gui[player.index] = gui
+    
+end)
+
+script.on_event(defines.events.on_gui_closed, function(event)
+    local frame = event.element
+    if event.gui_type ~= defines.gui_type.custom or not frame or not frame.valid or frame.name ~= "time_series" then
+        return
+    end
+    local player = game.players[event.player_index]
+    local gui = global.gui[player.index]
+    local entry = gui.entry
+
+    local title_text = ""
+    for _,item in pairs(gui.element.children) do
+        
+        if item.name == 'entity-title' then
+            title_text=item.text
+        end  
+    end
+
+    Entity.set_data(entry.entity,{stat_title = title_text})
+    global.gui[player.index] = nil
+    frame.destroy()
+end)
