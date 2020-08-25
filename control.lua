@@ -46,32 +46,35 @@ end
 local function write_global_data(event)
 
     data_to_write = ""
+    game_name = settings.global["game-name"].value
 
     for k, force in pairs(game.forces) do
         for _, statName in pairs(statistics) do
             for item, amount in pairs(force[statName].input_counts) do
                 data_to_write = data_to_write ..
-                                    merge_line(game_name, game.tick, force.name,
+                                    merge_line(game.tick, game_name, force.name,
                                                statName, "input", item, amount) ..
                                     "\n"
             end
 
             for item, amount in pairs(force[statName].output_counts) do
                 data_to_write = data_to_write ..
-                                    merge_line(game_name, game.tick, force.name,
+                                    merge_line(game.tick, game_name, force.name,
                                                statName, "output", item, amount) ..
                                     "\n"
             end
         end
     end
-    log_data(game.tick, data_to_write,  "global_data" .. "-" .. settings.global['game-name'].value)
+    log_data(game.tick, data_to_write,
+             "global_data" .. "-" .. settings.global['game-name'].value)
 
 end
 
-local function merge_line_combinator(tick,game_name, entity_id, stat_title, signal_type,
-                                     signal_name, amount)
-    local line = tick .. "," .. game_name .. "," .. entity_id .. "," .. stat_title .. "," ..
-                     signal_type .. "," .. signal_name .. "," .. amount
+local function merge_line_combinator(tick, game_name, entity_id, stat_title,
+                                     signal_type, signal_name, amount)
+    local line = tick .. "," .. game_name .. "," .. entity_id .. "," ..
+                     stat_title .. "," .. signal_type .. "," .. signal_name ..
+                     "," .. amount
     return line
 end
 
@@ -85,7 +88,14 @@ local function write_combinator_data(event)
 
         local data = Entity.get_data(entity)
 
-        if data == nil then return end
+        if data == nil then goto wc_skip_to_next end
+
+
+        local entity_enabled = data["fac_stats_entity_enabled"] or false
+
+        if not entity_enabled then
+            goto wc_skip_to_next
+        end
 
         local stat_title = data["stat_title"]
         local signals = entity.get_merged_signals()
@@ -133,6 +143,8 @@ local function on_place_entity(event)
     local entity = event.created_entity
     if not entity.valid or not ENTITY_NAMES[entity.name] then return end
     Entity.set_data(entity, {stat_title = entity.unit_number})
+    Entity.set_data(entity, {fac_stats_entity_enabled = false})
+
     entity.get_control_behavior().enabled = false
     local entry
     if entity.name == "fac-stats" then
@@ -175,7 +187,7 @@ script.on_event(defines.events.on_gui_opened, function(event)
     end
     local frame = player.gui.center.add {
         type = "frame",
-        name = "time_series",
+        name = "fac_stats",
         caption = caption,
         direction = "vertical"
     }
@@ -188,13 +200,19 @@ script.on_event(defines.events.on_gui_opened, function(event)
     }
 
     local data = Entity.get_data(entity)
-    local text = ""
-    if data then
-        text = data["stat_title"]
-    else
-        text = "None"
-    end
-    local text_label = frame.add {
+
+    local text = data["stat_title"] or "none"
+    local entity_enabled = data["fac_stats_entity_enabled"] or false
+
+    local text_label = frame.add({
+        type = "checkbox",
+        name = "entity-enabled",
+        state = entity_enabled,
+        caption = "Enable Combinator"
+
+    })
+
+    local text_input = frame.add {
         type = "textfield",
         name = "entity-title",
         caption = "Name",
@@ -210,18 +228,23 @@ end)
 script.on_event(defines.events.on_gui_closed, function(event)
     local frame = event.element
     if event.gui_type ~= defines.gui_type.custom or not frame or not frame.valid or
-        frame.name ~= "time_series" then return end
+        frame.name ~= "fac_stats" then return end
     local player = game.players[event.player_index]
     local gui = global.gui[player.index]
     local entry = gui.entry
-
     local title_text = ""
+    local checkbox_state = true
     for _, item in pairs(gui.element.children) do
 
         if item.name == 'entity-title' then title_text = item.text end
+        if item.name == 'entity-enabled' then checkbox_state = item.state end
     end
 
-    Entity.set_data(entry.entity, {stat_title = title_text})
+    Entity.set_data(entry.entity, {
+        fac_stats_entity_enabled = checkbox_state,
+        stat_title = title_text
+    })
+
     global.gui[player.index] = nil
     frame.destroy()
 end)
