@@ -4,11 +4,12 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+    
         {
             "type": "factoriomod",
             "request": "launch",
             "name": "fac-stats",
-            "factorioPath": "/home/sam/Documents/factorio/bin/x64/factorio"
+            "factorioPath": "/home/nipper/Documents/factorio/bin/x64/factorio"
         }
     ]
 }

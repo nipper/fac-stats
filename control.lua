@@ -21,6 +21,8 @@ local TYPE_MAP = {virtual = "virtual-signal"}
 script.on_init(function()
     global.registry = {}
     global.gui = {}
+
+
 end)
 
 local statistics = {
@@ -31,15 +33,23 @@ local statistics = {
 local function log_data(tick, line, file_prefix)
 
     game.write_file(
-        settings.global["folder-name"].value .. "/" .. file_prefix .. "_" ..
-            tick .. ".csv", line .. "\n", false)
+        settings.global["folder-name"].value .. "/" .. settings.global['game-name'].value .. "/" ..
+            file_prefix .. "_" .. tick .. ".csv", line .. "\n", false)
 end
 
-local function merge_line(tick, name, force_name, stat_name, prod_type, item,
-                          amount)
+local function merge_global_line(tick, name, force_name, stat_name, prod_type,
+                                 item, amount)
     line =
-        name .. "," .. tick .. "," .. force_name .. "," .. stat_name .. "," ..
+         name .. "," .. tick .. "," .. force_name .. "," .. stat_name .. "," ..
             prod_type .. "," .. item .. "," .. amount
+    return line
+end
+
+local function merge_line_combinator(tick, game_name, entity_id, stat_title,
+                                     signal_type, signal_name, amount)
+    local line = game_name .. "," .. tick .. "," .. entity_id .. "," ..
+                     stat_title .. "," .. signal_type .. "," .. signal_name ..
+                     "," .. amount
     return line
 end
 
@@ -52,15 +62,17 @@ local function write_global_data(event)
         for _, statName in pairs(statistics) do
             for item, amount in pairs(force[statName].input_counts) do
                 data_to_write = data_to_write ..
-                                    merge_line(game.tick, game_name, force.name,
-                                               statName, "input", item, amount) ..
+                                    merge_global_line(game.tick, game_name,
+                                                      force.name, statName,
+                                                      "input", item, amount) ..
                                     "\n"
             end
 
             for item, amount in pairs(force[statName].output_counts) do
                 data_to_write = data_to_write ..
-                                    merge_line(game.tick, game_name, force.name,
-                                               statName, "output", item, amount) ..
+                                    merge_global_line(game.tick, game_name,
+                                                      force.name, statName,
+                                                      "output", item, amount) ..
                                     "\n"
             end
         end
@@ -68,14 +80,6 @@ local function write_global_data(event)
     log_data(game.tick, data_to_write,
              "global_data" .. "-" .. settings.global['game-name'].value)
 
-end
-
-local function merge_line_combinator(tick, game_name, entity_id, stat_title,
-                                     signal_type, signal_name, amount)
-    local line = tick .. "," .. game_name .. "," .. entity_id .. "," ..
-                     stat_title .. "," .. signal_type .. "," .. signal_name ..
-                     "," .. amount
-    return line
 end
 
 local function write_combinator_data(event)
@@ -90,12 +94,9 @@ local function write_combinator_data(event)
 
         if data == nil then goto wc_skip_to_next end
 
-
         local entity_enabled = data["fac_stats_entity_enabled"] or false
 
-        if not entity_enabled then
-            goto wc_skip_to_next
-        end
+        if not entity_enabled then goto wc_skip_to_next end
 
         local stat_title = data["stat_title"]
         local signals = entity.get_merged_signals()
