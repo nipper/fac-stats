@@ -55,7 +55,7 @@ end
 
 local function write_global_data(event)
 
-    data_to_write = ""
+    data_to_write = "game_name,tick,force,stat,type,item,amount\n"
     game_name = settings.global["game-name"].value
 
     for k, force in pairs(game.forces) do
@@ -84,7 +84,7 @@ end
 
 local function write_combinator_data(event)
 
-    local data_to_write = ""
+    local data_to_write = "game_name,tick,entity_id,stat,signal_type,signal_name,value\n"
     for entity_number, entry in pairs(global.registry) do
         local entity = entry.entity
 

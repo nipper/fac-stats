@@ -11,6 +11,16 @@
 				"kind": "build",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "Copy to mod folder",
+			"type": "shell",
+			"command": "cp",
+			"args": [
+				"fac-stats_0.1.0.zip",
+				"/Users/sphinizy/Library/Application Support/factorio/mods"
+			],
+			"problemMatcher": []
 		}
 	]
 }
