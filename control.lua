@@ -85,6 +85,7 @@ end
 local function write_combinator_data(event)
 
     local data_to_write = "game_name,tick,entity_id,stat,signal_type,signal_name,value\n"
+    local entities_written = 0
     for entity_number, entry in pairs(global.registry) do
         local entity = entry.entity
 
@@ -98,6 +99,7 @@ local function write_combinator_data(event)
 
         if not entity_enabled then goto wc_skip_to_next end
 
+        entities_written = entities_written + 1
         local stat_title = data["stat_title"]
         local signals = entity.get_merged_signals()
 
@@ -121,9 +123,10 @@ local function write_combinator_data(event)
 
         ::wc_skip_to_next::
     end
-    log_data(game.tick, data_to_write,
-             "combinator_data" .. "-" .. settings.global['game-name'].value)
-
+    if entities_written > 0 then
+        log_data(game.tick, data_to_write,
+                "combinator_data" .. "-" .. settings.global['game-name'].value)
+    end
 end
 
 local function on_tick(event)
