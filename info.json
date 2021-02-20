@@ -3,8 +3,8 @@
     "version": "0.1.0",
     "title": "Factorio Stats",
     "author": "You",
-    "factorio_version": "0.18",
-    "dependencies": ["base >= 0.18"],
+    "factorio_version": "1.1",
+    "dependencies": ["base >= 0.18","stdlib"],
     "description": "Allows for export of global and combinator specific data for use in data analysis"
     
 }

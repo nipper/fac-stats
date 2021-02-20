@@ -62,7 +62,7 @@ end
 local time_series_entity = table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])
 
 time_series_entity.name = "fac-stats"
-time_series_entity.icon = "__base__/graphics/icons/computer.png"
+time_series_entity.icon = "__base__/graphics/icons/centrifuge.png"
 time_series_entity.minable.result = "fac-stats"
 time_series_entity.item_slot_count = 0
 
